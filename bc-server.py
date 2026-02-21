@@ -9,7 +9,7 @@ from flask import Flask, jsonify, request, Response, send_from_directory
 
 app = Flask(__name__)
 DB    = os.path.expanduser('~/.better-control/better-control.db')
-TOKEN = secrets.token_urlsafe(16)
+TOKEN = os.environ.get("BC_TOKEN") or secrets.token_urlsafe(16)
 
 # ═══════════════════════════════════════════
 # AUTH
