@@ -534,7 +534,7 @@ async function claimTask(id) {
     await fetch(API(`/api/task/${id}/claim`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent: 'betta-mobile' })
+      body: JSON.stringify({ agent: 'betta' })
     });
     closeSheet();
     await refreshBoard();
