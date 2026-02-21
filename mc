@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# mc — Betta task coordination launcher
+set -euo pipefail
+
+DB_DIR="$HOME/.openclaw"
+DB="$DB_DIR/mission-control.db"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+init_db() {
+    mkdir -p "$DB_DIR"
+    if [ ! -f "$DB" ]; then
+        echo "  Initializing database at $DB"
+        sqlite3 "$DB" < "$SCRIPT_DIR/schema.sql"
+        echo "  Done."
+    fi
+}
+
+cmd="${1:-start}"
+shift || true
+
+case "$cmd" in
+    start)
+        init_db
+        exec python3 "$SCRIPT_DIR/mc-server.py" "$@"
+        ;;
+
+    init)
+        init_db
+        echo "  Database ready."
+        ;;
+
+    add)
+        # mc add "subject" ["description"] [priority]
+        SUBJECT="${1:?Usage: mc add <subject> [description] [priority]}"
+        DESC="${2:-}"
+        PRI="${3:-0}"
+        sqlite3 "$DB" \
+            "INSERT INTO tasks (subject, description, priority) VALUES ('$SUBJECT','$DESC',$PRI);"
+        echo "  Task added."
+        ;;
+
+    ls|list)
+        sqlite3 -column -header "$DB" \
+            "SELECT id, status, priority, owner, subject FROM tasks WHERE status != 'done' ORDER BY priority DESC, id;"
+        ;;
+
+    done)
+        ID="${1:?Usage: mc done <task_id>}"
+        sqlite3 "$DB" \
+            "UPDATE tasks SET status='done', completed_at=datetime('now'), updated_at=datetime('now') WHERE id=$ID;"
+        echo "  Task $ID marked done."
+        ;;
+
+    reset)
+        read -rp "  Drop and recreate all tables? [y/N] " yn
+        [[ "$yn" =~ ^[Yy]$ ]] || exit 0
+        sqlite3 "$DB" "DROP TABLE IF EXISTS messages; DROP TABLE IF EXISTS tasks; DROP TABLE IF EXISTS agents;"
+        sqlite3 "$DB" < "$SCRIPT_DIR/schema.sql"
+        echo "  Database reset."
+        ;;
+
+    *)
+        echo "Usage: mc <command> [args]"
+        echo ""
+        echo "  start          Init DB (if needed) and start the web server"
+        echo "  init           Init DB only"
+        echo "  add <subject>  Add a task"
+        echo "  ls             List open tasks"
+        echo "  done <id>      Mark a task done"
+        echo "  reset          Drop and recreate all tables"
+        exit 1
+        ;;
+esac
