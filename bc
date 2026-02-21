@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mc — Betta task coordination launcher
+# bc — Betta task coordination launcher
 set -euo pipefail
 
 DB_DIR="$HOME/.openclaw"
@@ -21,7 +21,7 @@ shift || true
 case "$cmd" in
     start)
         init_db
-        exec python3 "$SCRIPT_DIR/mc-server.py" "$@"
+        exec python3 "$SCRIPT_DIR/bc-server.py" "$@"
         ;;
 
     init)
@@ -30,8 +30,8 @@ case "$cmd" in
         ;;
 
     add)
-        # mc add "subject" ["description"] [priority]
-        SUBJECT="${1:?Usage: mc add <subject> [description] [priority]}"
+        # bc add "subject" ["description"] [priority]
+        SUBJECT="${1:?Usage: bc add <subject> [description] [priority]}"
         DESC="${2:-}"
         PRI="${3:-0}"
         sqlite3 "$DB" \
@@ -45,7 +45,7 @@ case "$cmd" in
         ;;
 
     done)
-        ID="${1:?Usage: mc done <task_id>}"
+        ID="${1:?Usage: bc done <task_id>}"
         sqlite3 "$DB" \
             "UPDATE tasks SET status='done', completed_at=datetime('now'), updated_at=datetime('now') WHERE id=$ID;"
         echo "  Task $ID marked done."
@@ -60,7 +60,7 @@ case "$cmd" in
         ;;
 
     *)
-        echo "Usage: mc <command> [args]"
+        echo "Usage: bc <command> [args]"
         echo ""
         echo "  start          Init DB (if needed) and start the web server"
         echo "  init           Init DB only"
