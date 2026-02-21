@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Betta</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-highlight: rgba(255, 255, 255, 0.18);
+      --glass-blur: blur(20px);
+    }
+
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: #060614;
+      color: #e8eaf6;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(88, 28, 235, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 80%, rgba(6, 182, 212, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glass utility */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+    }
+
+    .glass-strong {
+      background: rgba(255, 255, 255, 0.09);
+      backdrop-filter: blur(32px) saturate(1.4);
+      -webkit-backdrop-filter: blur(32px) saturate(1.4);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    /* Header */
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(6, 6, 20, 0.55);
+      backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Pill badges */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .pill-cyan   { background: rgba(6,182,212,0.15);  border: 1px solid rgba(6,182,212,0.3);  color: #67e8f9; }
+    .pill-violet { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #c4b5fd; }
+    .pill-amber  { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fcd34d; }
+    .pill-green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+    .pill-red    { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+    .pill-gray   { background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.2);color: #94a3b8; }
+
+    /* Task cards */
+    .task-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .task-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: var(--glass-highlight);
+      border-radius: 16px 16px 0 0;
+    }
+    .task-card:active { transform: scale(0.985); }
+    .task-card:hover  {
+      background: rgba(255,255,255,0.09);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    /* Priority accent — left border glow */
+    .priority-high   { box-shadow: inset 3px 0 0 rgba(239,68,68,0.7); }
+    .priority-medium { box-shadow: inset 3px 0 0 rgba(245,158,11,0.6); }
+    .priority-low    { box-shadow: inset 3px 0 0 rgba(148,163,184,0.4); }
+
+    /* Section headers */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      padding: 0 4px;
+    }
+
+    /* Agent dot */
+    .agent-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-active  { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,0.6); }
+    .dot-idle    { background: #fbbf24; }
+    .dot-offline { background: #64748b; }
+
+    /* Connection badge */
+    #conn-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .conn-live    { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.7); }
+    .conn-stale   { background: #fbbf24; }
+    .conn-offline { background: #64748b; }
+
+    /* Bottom sheet */
+    #detail-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    #detail-sheet.open {
+      pointer-events: auto;
+      opacity: 1;
+    }
+    #sheet-scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    #sheet-body {
+      position: relative;
+      z-index: 1;
+      background: rgba(12, 12, 32, 0.85);
+      backdrop-filter: blur(40px) saturate(1.8);
+      -webkit-backdrop-filter: blur(40px) saturate(1.8);
+      border-top: 1px solid rgba(255,255,255,0.14);
+      border-radius: 24px 24px 0 0;
+      padding: 0 20px 40px;
+      max-height: 80vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    #sheet-body::before {
+      content: '';
+      display: block;
+      width: 36px;
+      height: 4px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 2px;
+      margin: 12px auto 20px;
+    }
+    #detail-sheet.open #sheet-body { transform: translateY(0); }
+
+    /* Action buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.96); opacity: 0.85; }
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(139,92,246,0.9), rgba(6,182,212,0.8));
+      color: #fff;
+      box-shadow: 0 2px 16px rgba(139,92,246,0.3);
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+    }
+    .btn-danger {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+    }
+
+    /* Skeleton loader */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+    /* Textarea */
+    textarea {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #e8eaf6;
+      font-family: inherit;
+      padding: 10px 12px;
+      font-size: 14px;
+      resize: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: rgba(139,92,246,0.5);
+    }
+    textarea::placeholder { color: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div style="max-width:600px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:12px">
+    <!-- Logo mark -->
+    <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#06b6d4);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 12px rgba(124,58,237,0.4)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:17px;font-weight:700;letter-spacing:-0.02em;color:#fff">Betta</div>
+      <div id="header-sub" style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:1px">Loading…</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:5px">
+        <div id="conn-dot" class="conn-offline"></div>
+        <span id="conn-label" style="font-size:11px;color:rgba(255,255,255,0.35)">–</span>
+      </div>
+      <button onclick="refreshBoard()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 8px;cursor:pointer;color:rgba(255,255,255,0.6);font-size:14px;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.07)'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.67"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div style="position:relative;z-index:1;max-width:600px;margin:0 auto;padding:20px 16px 100px">
+
+  <!-- Agents strip -->
+  <div id="agents-strip" style="margin-bottom:24px"></div>
+
+  <!-- Board -->
+  <div id="board">
+    <!-- Skeleton -->
+    <div id="skeleton">
+      <div class="section-label" style="margin-bottom:10px">Pending</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+        <div class="skeleton" style="height:72px"></div>
+        <div class="skeleton" style="height:60px"></div>
+      </div>
+      <div class="section-label" style="margin-bottom:10px">In Progress</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="skeleton" style="height:72px"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DETAIL SHEET -->
+<div id="detail-sheet">
+  <div id="sheet-scrim" onclick="closeSheet()"></div>
+  <div id="sheet-body">
+    <div id="sheet-content"></div>
+  </div>
+</div>
+
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const params  = new URLSearchParams(location.search);
+const TOKEN   = params.get('token') || '';
+const API     = (path) => `${path}?token=${TOKEN}`;
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let boardData  = null;
+let detailTask = null;
+let sse        = null;
+let sseRetry   = 1000;
+
+// ─── Utility ─────────────────────────────────────────────────────────────────
+const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function relTime(ts) {
+  if (!ts) return '';
+  const d = (Date.now() - new Date(ts + (ts.includes('Z') ? '' : 'Z'))) / 1000;
+  if (d < 60)   return 'just now';
+  if (d < 3600) return `${Math.floor(d/60)}m ago`;
+  if (d < 86400)return `${Math.floor(d/3600)}h ago`;
+  return `${Math.floor(d/86400)}d ago`;
+}
+
+function priorityClass(p) {
+  if (p >= 8) return 'priority-high';
+  if (p >= 4) return 'priority-medium';
+  return 'priority-low';
+}
+
+function statusPill(s) {
+  const map = {
+    pending:     ['pill-cyan',   'Pending'],
+    in_progress: ['pill-violet', 'In Progress'],
+    claimed:     ['pill-violet', 'Claimed'],
+    blocked:     ['pill-amber',  'Blocked'],
+    review:      ['pill-amber',  'Review'],
+    done:        ['pill-green',  'Done'],
+  };
+  const [cls, label] = map[s] || ['pill-gray', s];
+  return `<span class="pill ${cls}">${esc(label)}</span>`;
+}
+
+// ─── Render: agents ───────────────────────────────────────────────────────────
+function renderAgents(agents) {
+  if (!agents || agents.length === 0) {
+    document.getElementById('agents-strip').innerHTML = '';
+    return;
+  }
+  const pills = agents.map(a => {
+    const secAgo = a.last_seen ? (Date.now() - new Date(a.last_seen + 'Z')) / 1000 : Infinity;
+    const dotCls = secAgo < 120 ? 'dot-active' : secAgo < 600 ? 'dot-idle' : 'dot-offline';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
+      <div class="agent-dot ${dotCls}"></div>
+      <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75)">${esc(a.name)}</span>
+      ${a.role ? `<span style="font-size:11px;color:rgba(255,255,255,0.3)">${esc(a.role)}</span>` : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('agents-strip').innerHTML = `
+    <div style="margin-bottom:8px" class="section-label">Agents</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${pills}</div>`;
+}
+
+// ─── Render: board ────────────────────────────────────────────────────────────
+function renderBoard(data) {
+  boardData = data;
+  document.getElementById('skeleton').style.display = 'none';
+
+  const groups = {
+    in_progress: { label: 'In Progress', tasks: [] },
+    pending:     { label: 'Pending',     tasks: [] },
+    blocked:     { label: 'Blocked',     tasks: [] },
+    done:        { label: 'Done',        tasks: [] },
+  };
+
+  (data.tasks || []).forEach(t => {
+    const key = (t.status === 'claimed') ? 'in_progress'
+              : (t.status === 'review')  ? 'blocked'
+              : groups[t.status]         ? t.status
+              : 'pending';
+    groups[key].tasks.push(t);
+  });
+
+  const active = (groups.in_progress.tasks.length + groups.pending.tasks.length);
+  document.getElementById('header-sub').textContent =
+    `${(data.agents||[]).length} agent${(data.agents||[]).length !== 1 ? 's' : ''} · ${active} active`;
+
+  let html = '';
+  for (const [, g] of Object.entries(groups)) {
+    if (g.tasks.length === 0) continue;
+    html += `<div style="margin-bottom:24px">
+      <div class="section-label" style="margin-bottom:10px">${g.label} <span style="opacity:0.5;font-size:10px">${g.tasks.length}</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">`;
+    g.tasks.forEach(t => {
+      html += `<div class="task-card ${priorityClass(t.priority || 0)}" onclick="openTask(${t.id})">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+          <div style="font-size:14px;font-weight:600;color:#fff;line-height:1.35;flex:1">${esc(t.subject)}</div>
+          ${statusPill(t.status)}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${t.owner ? `<span style="font-size:11px;color:rgba(255,255,255,0.4)">@${esc(t.owner)}</span>` : ''}
+          <span style="font-size:11px;color:rgba(255,255,255,0.25)">${relTime(t.updated_at)}</span>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (html === '') {
+    html = `<div style="text-align:center;padding:60px 20px">
+      <div style="font-size:32px;margin-bottom:12px">🐟</div>
+      <div style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.5)">All clear</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.25);margin-top:4px">No tasks yet</div>
+    </div>`;
+  }
+
+  const existing = document.getElementById('board-content');
+  if (existing) {
+    existing.innerHTML = html;
+  } else {
+    const el = document.createElement('div');
+    el.id = 'board-content';
+    el.innerHTML = html;
+    document.getElementById('board').appendChild(el);
+  }
+
+  renderAgents(data.agents);
+}
+
+// ─── Task detail ──────────────────────────────────────────────────────────────
+async function openTask(id) {
+  document.getElementById('detail-sheet').classList.add('open');
+  document.getElementById('sheet-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="skeleton" style="height:24px;width:70%"></div>
+      <div class="skeleton" style="height:16px;width:40%"></div>
+      <div class="skeleton" style="height:80px"></div>
+    </div>`;
+
+  try {
+    const res  = await fetch(API(`/api/task/${id}`));
+    const data = await res.json();
+    detailTask = data.task;
+    renderDetail(data.task, data.messages || []);
+  } catch {
+    document.getElementById('sheet-content').innerHTML = `<div style="color:#fca5a5;font-size:14px">Failed to load task.</div>`;
+  }
+}
+
+function renderDetail(task, messages) {
+  const canClaim    = task.status === 'pending' || task.status === 'blocked';
+  const canComplete = task.status === 'in_progress' || task.status === 'claimed';
+
+  const msgHtml = messages.length ? messages.map(m => `
+    <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">@${esc(m.from_agent)}</span>
+        <span style="font-size:11px;color:rgba(255,255,255,0.25)">${relTime(m.created_at)}</span>
+        ${m.msg_type !== 'note' ? `<span class="pill pill-gray" style="font-size:10px;padding:1px 7px">${esc(m.msg_type)}</span>` : ''}
+      </div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.5">${esc(m.body)}</div>
+    </div>`).join('') : '';
+
+  document.getElementById('sheet-content').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px">
+      <div style="font-size:18px;font-weight:700;color:#fff;line-height:1.3;flex:1">${esc(task.subject)}</div>
+      <button onclick="closeSheet()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px;cursor:pointer;color:rgba(255,255,255,0.5);flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+      ${statusPill(task.status)}
+      ${task.owner ? `<span class="pill pill-gray">@${esc(task.owner)}</span>` : ''}
+      ${task.priority >= 8 ? `<span class="pill pill-red">High Priority</span>` : task.priority >= 4 ? `<span class="pill pill-amber">Medium</span>` : ''}
+    </div>
+
+    ${task.description ? `<div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:16px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">${esc(task.description)}</div>` : ''}
+
+    ${msgHtml ? `<div style="margin-bottom:16px">${msgHtml}</div>` : ''}
+
+    ${canClaim || canComplete ? `
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      ${canComplete ? `
+        <textarea id="complete-note" rows="2" placeholder="Completion note (optional)…"></textarea>
+        <button class="btn btn-primary" onclick="completeTask(${task.id})" style="width:100%">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Mark Complete
+        </button>` : ''}
+      ${canClaim ? `
+        <button class="btn btn-ghost" onclick="claimTask(${task.id})" style="width:100%">
+          Claim Task
+        </button>` : ''}
+    </div>` : ''}
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:16px">
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:2px">Created</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.4)">${relTime(task.created_at)}</div>
+      </div>
+      ${task.updated_at ? `<div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:2px">Updated</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.4)">${relTime(task.updated_at)}</div>
+      </div>` : ''}
+    </div>`;
+}
+
+function closeSheet() {
+  document.getElementById('detail-sheet').classList.remove('open');
+  detailTask = null;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+async function claimTask(id) {
+  try {
+    await fetch(API(`/api/task/${id}/claim`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'betta-mobile' })
+    });
+    closeSheet();
+    await refreshBoard();
+  } catch {
+    alert('Failed to claim task.');
+  }
+}
+
+async function completeTask(id) {
+  const note = document.getElementById('complete-note')?.value?.trim() || '';
+  try {
+    await fetch(API(`/api/task/${id}/complete`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note })
+    });
+    closeSheet();
+    await refreshBoard();
+  } catch {
+    alert('Failed to complete task.');
+  }
+}
+
+// ─── Data fetching ────────────────────────────────────────────────────────────
+async function refreshBoard() {
+  try {
+    const res  = await fetch(API('/api/board'));
+    const data = await res.json();
+    renderBoard(data);
+    setConn('live');
+    localStorage.setItem('betta-board', JSON.stringify({ data, ts: Date.now() }));
+  } catch {
+    setConn('offline');
+    const cached = localStorage.getItem('betta-board');
+    if (cached) {
+      const { data } = JSON.parse(cached);
+      renderBoard(data);
+      document.getElementById('header-sub').textContent += ' (cached)';
+    }
+  }
+}
+
+// ─── SSE ──────────────────────────────────────────────────────────────────────
+function connectSSE() {
+  if (sse) sse.close();
+  sse = new EventSource(API('/api/heartbeat'));
+  sse.onopen    = () => { sseRetry = 1000; setConn('live'); };
+  sse.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.refresh) refreshBoard();
+  };
+  sse.onerror = () => {
+    setConn('stale');
+    sse.close();
+    setTimeout(connectSSE, sseRetry);
+    sseRetry = Math.min(sseRetry * 2, 30000);
+  };
+}
+
+// ─── Connection indicator ─────────────────────────────────────────────────────
+function setConn(state) {
+  const dot   = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-label');
+  dot.className   = `conn-${state}`;
+  label.textContent = state === 'live' ? 'Live' : state === 'stale' ? 'Stale' : 'Offline';
+}
+
+// ─── Visibility ───────────────────────────────────────────────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshBoard();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+(async () => {
+  // Show cached data immediately if available
+  const cached = localStorage.getItem('betta-board');
+  if (cached) {
+    const { data } = JSON.parse(cached);
+    renderBoard(data);
+    setConn('stale');
+  }
+  await refreshBoard();
+  connectSSE();
+})();
+</script>
+</body>
+</html>
