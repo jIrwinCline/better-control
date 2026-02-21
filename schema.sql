@@ -1,4 +1,4 @@
--- Betta schema — run once to initialize ~/.openclaw/mission-control.db
+-- Better Control schema — run once to initialize ~/.better-control/better-control.db
 
 CREATE TABLE IF NOT EXISTS tasks (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,

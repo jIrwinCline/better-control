@@ -423,11 +423,13 @@ async function openDetail(taskId) {
 }
 
 function renderDetail(task, messages) {
-  const canClaim    = !task.owner || task.status === 'pending';
+  const canClaim    = task.status === 'pending' || task.status === 'blocked';
   const canComplete = task.status === 'in_progress' || task.status === 'claimed';
   const statusPill  = task.status === 'done'        ? 'pill-green'  :
                       task.status === 'in_progress' ? 'pill-cyan'   :
-                      task.status === 'blocked'     ? 'pill-red'    : 'pill-violet';
+                      task.status === 'claimed'     ? 'pill-cyan'   :
+                      task.status === 'blocked'     ? 'pill-red'    :
+                      task.status === 'review'      ? 'pill-amber'  : 'pill-violet';
 
   return `
     <div class="space-y-4">

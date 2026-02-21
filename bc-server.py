@@ -8,7 +8,7 @@ import sqlite3
 from flask import Flask, jsonify, request, Response, send_from_directory
 
 app = Flask(__name__)
-DB    = os.path.expanduser('~/.openclaw/mission-control.db')
+DB    = os.path.expanduser('~/.better-control/better-control.db')
 TOKEN = secrets.token_urlsafe(16)
 
 # ═══════════════════════════════════════════
@@ -173,7 +173,7 @@ def heartbeat():
 
 if __name__ == '__main__':
     print(f"\n{'─'*52}")
-    print(f"  Betta  ·  Task Coordination")
+    print(f"  Better Control  ·  Task Coordination")
     print(f"{'─'*52}")
     print(f"\n  Local:    http://localhost:3737/?token={TOKEN}")
     print(f"  Network:  http://<your-ip>:3737/?token={TOKEN}")

@@ -2,8 +2,8 @@
 # bc — Betta task coordination launcher
 set -euo pipefail
 
-DB_DIR="$HOME/.openclaw"
-DB="$DB_DIR/mission-control.db"
+DB_DIR="$HOME/.better-control"
+DB="$DB_DIR/better-control.db"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 init_db() {
@@ -34,8 +34,11 @@ case "$cmd" in
         SUBJECT="${1:?Usage: bc add <subject> [description] [priority]}"
         DESC="${2:-}"
         PRI="${3:-0}"
+        [[ "$PRI" =~ ^[0-9]+$ ]] || { echo "  Error: priority must be a number"; exit 1; }
+        SUBJECT_ESC="${SUBJECT//\'/\'\'}"
+        DESC_ESC="${DESC//\'/\'\'}"
         sqlite3 "$DB" \
-            "INSERT INTO tasks (subject, description, priority) VALUES ('$SUBJECT','$DESC',$PRI);"
+            "INSERT INTO tasks (subject, description, priority) VALUES ('${SUBJECT_ESC}','${DESC_ESC}',${PRI});"
         echo "  Task added."
         ;;
 
@@ -46,8 +49,9 @@ case "$cmd" in
 
     done)
         ID="${1:?Usage: bc done <task_id>}"
+        [[ "$ID" =~ ^[0-9]+$ ]] || { echo "  Error: task ID must be a number"; exit 1; }
         sqlite3 "$DB" \
-            "UPDATE tasks SET status='done', completed_at=datetime('now'), updated_at=datetime('now') WHERE id=$ID;"
+            "UPDATE tasks SET status='done', completed_at=datetime('now'), updated_at=datetime('now') WHERE id=${ID};"
         echo "  Task $ID marked done."
         ;;
 
