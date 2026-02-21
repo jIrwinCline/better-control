@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Betta</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --glass-bg:        rgba(255,255,255,0.06);
+      --glass-border:    rgba(255,255,255,0.12);
+      --glass-highlight: rgba(255,255,255,0.18);
+      --glass-blur:      blur(20px);
+    }
+
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: #060614;
+      color: #e8eaf6;
+      overscroll-behavior-y: contain;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%,  rgba(88,28,235,0.18)  0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 80%,  rgba(6,182,212,0.12)  0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 50% 50%,  rgba(139,92,246,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* All content above the ambient layer */
+    header, main, #sheet-backdrop, #sheet, #loading, #error-overlay {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Glass utilities */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+    }
+    .glass-strong {
+      background: rgba(255,255,255,0.09);
+      backdrop-filter: blur(32px) saturate(1.4);
+      -webkit-backdrop-filter: blur(32px) saturate(1.4);
+      border: 1px solid rgba(255,255,255,0.16);
+    }
+    .glass-card {
+      background: rgba(255,255,255,0.055);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 16px;
+      transition: background 150ms ease, transform 100ms ease;
+    }
+    .glass-card:active {
+      background: rgba(255,255,255,0.09);
+      transform: scale(0.98);
+    }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(6,6,20,0.55);
+      backdrop-filter: blur(24px) saturate(1.6);
+      -webkit-backdrop-filter: blur(24px) saturate(1.6);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Pill badges */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .pill-cyan   { background: rgba(6,182,212,0.15);  border: 1px solid rgba(6,182,212,0.3);  color: #67e8f9; }
+    .pill-violet { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #c4b5fd; }
+    .pill-amber  { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fcd34d; }
+    .pill-green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+    .pill-red    { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+
+    /* Priority markers */
+    .priority-2::after { content: ' !!!'; color: #fca5a5; font-weight: bold; }
+    .priority-1::after { content: ' !';   color: #fcd34d; }
+
+    /* Agent status dot */
+    .agent-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .agent-dot.active  { background: #6ee7b7; box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+    .agent-dot.idle    { background: #fcd34d; }
+    .agent-dot.offline { background: #6b7280; }
+
+    /* Touch targets */
+    .btn-action {
+      min-height: 48px;
+      min-width: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .section-header { min-height: 44px; }
+
+    /* Bottom sheet */
+    .sheet-hidden  { transform: translateY(100%); }
+    .sheet-visible { transform: translateY(0); }
+
+    /* Skeleton shimmer */
+    .skeleton {
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 10px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    .animate-spin  { animation: spin  1s linear     infinite; }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+
+    /* Glass action buttons */
+    .btn-glass {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #e8eaf6;
+      border-radius: 14px;
+      transition: background 150ms, border-color 150ms;
+    }
+    .btn-glass:active { background: rgba(255,255,255,0.13); }
+
+    .btn-cyan {
+      background: rgba(6,182,212,0.18);
+      border: 1px solid rgba(6,182,212,0.35);
+      color: #67e8f9;
+      border-radius: 14px;
+      transition: background 150ms;
+    }
+    .btn-cyan:active { background: rgba(6,182,212,0.28); }
+
+    .btn-green {
+      background: rgba(16,185,129,0.18);
+      border: 1px solid rgba(16,185,129,0.35);
+      color: #6ee7b7;
+      border-radius: 14px;
+      transition: background 150ms;
+    }
+    .btn-green:active { background: rgba(16,185,129,0.28); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="p-4" style="z-index:50">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-semibold tracking-tight flex items-center gap-2" style="color:#e8eaf6">
+          <span style="font-size:1.1rem">✦</span> Betta
+        </h1>
+        <p id="header-stats" class="text-xs mt-0.5" style="color:rgba(232,234,246,0.45)">Loading…</p>
+      </div>
+      <button onclick="fetchBoard()" class="btn-glass btn-action rounded-xl px-3">
+        <span id="refresh-icon" style="font-size:1.1rem">↻</span>
+      </button>
+    </div>
+
+    <div id="stale-banner" class="hidden mt-2 py-2 px-3 rounded-xl text-xs pill-amber">
+      ⚠ Offline — cached data from <span id="stale-time"></span>
+    </div>
+    <div id="connection-status" class="hidden mt-2 py-1 px-3 rounded-xl text-xs pill-green">
+      ● Live
+    </div>
+  </header>
+
+  <!-- Board -->
+  <main id="board" class="p-4 pb-24" style="z-index:1">
+    <div id="skeleton" class="space-y-4">
+      <div class="skeleton h-8 w-32"></div>
+      <div class="skeleton h-16"></div>
+      <div class="skeleton h-16"></div>
+      <div class="skeleton h-8 w-40 mt-6"></div>
+      <div class="skeleton h-16"></div>
+    </div>
+  </main>
+
+  <!-- Bottom Sheet Backdrop -->
+  <div id="sheet-backdrop"
+       class="fixed inset-0 hidden transition-opacity"
+       style="background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:20"
+       onclick="closeDetail()"></div>
+
+  <!-- Bottom Sheet -->
+  <div id="sheet"
+       class="fixed bottom-0 left-0 right-0 sheet-hidden"
+       style="background:rgba(12,10,30,0.82);backdrop-filter:blur(32px) saturate(1.4);-webkit-backdrop-filter:blur(32px) saturate(1.4);border-top:1px solid rgba(255,255,255,0.12);border-radius:24px 24px 0 0;z-index:30;max-height:85vh;display:flex;flex-direction:column;transition:transform 300ms cubic-bezier(.32,.72,0,1)">
+    <!-- Drag handle -->
+    <div class="flex justify-center py-3 cursor-grab" onclick="closeDetail()">
+      <div style="width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:999px"></div>
+    </div>
+    <!-- Content -->
+    <div id="sheet-content" class="px-4 pb-8 overflow-y-auto flex-1"></div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="fixed inset-0 flex items-center justify-center" style="background:#060614;z-index:50">
+    <div class="text-center">
+      <div class="text-5xl mb-4 animate-pulse" style="opacity:0.7">✦</div>
+      <p style="color:rgba(232,234,246,0.45);font-size:0.875rem">Loading Betta…</p>
+    </div>
+  </div>
+
+  <!-- Error overlay -->
+  <div id="error-overlay" class="fixed inset-0 flex items-center justify-center hidden" style="background:#060614;z-index:50">
+    <div class="text-center p-8">
+      <div class="text-5xl mb-4">🔒</div>
+      <p id="error-message" style="color:#fca5a5;margin-bottom:1rem">Error</p>
+      <p style="color:rgba(232,234,246,0.4);font-size:0.8rem">Check the server console for the access URL</p>
+    </div>
+  </div>
+
+  <script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const state = {
+  tasks: [],
+  agents: [],
+  selectedTask: null,
+  token: new URLSearchParams(location.search).get('token'),
+  sseRetries: 0,
+  eventSource: null
+};
+
+// ═══════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════
+const api = {
+  async get(endpoint) {
+    const res = await fetch(`${endpoint}?token=${state.token}`);
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  },
+  async post(endpoint, body = {}) {
+    const res = await fetch(`${endpoint}?token=${state.token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  }
+};
+
+// ═══════════════════════════════════════════
+// BOARD
+// ═══════════════════════════════════════════
+async function fetchBoard() {
+  const icon = document.getElementById('refresh-icon');
+  icon.classList.add('animate-spin');
+  try {
+    const data = await api.get('/api/board');
+    state.tasks  = data.tasks;
+    state.agents = data.agents;
+    renderBoard();
+    saveCache(data);
+    hideStaleIndicator();
+    document.getElementById('skeleton').classList.add('hidden');
+  } catch (e) {
+    console.error('Fetch error:', e);
+    if (e.message === 'Unauthorized') { showError('Invalid or missing token'); return; }
+    const cache = loadCache();
+    if (cache) {
+      state.tasks  = cache.data.tasks;
+      state.agents = cache.data.agents;
+      renderBoard();
+      showStaleIndicator(cache.timestamp);
+      document.getElementById('skeleton').classList.add('hidden');
+    } else {
+      showError('Cannot connect to server');
+    }
+  } finally {
+    icon.classList.remove('animate-spin');
+    document.getElementById('loading').classList.add('hidden');
+  }
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  const groups = {
+    pending:     state.tasks.filter(t => t.status === 'pending' || t.status === 'claimed'),
+    in_progress: state.tasks.filter(t => t.status === 'in_progress'),
+    blocked:     state.tasks.filter(t => t.status === 'blocked'),
+    done:        state.tasks.filter(t => t.status === 'done')
+  };
+
+  const activeAgents = state.agents.filter(a => a.status === 'busy').length;
+  document.getElementById('header-stats').textContent =
+    `${state.agents.length} agents · ${activeAgents} active · ${state.tasks.length} tasks`;
+
+  board.innerHTML = `
+    <div id="skeleton" class="hidden"></div>
+    ${renderSection('pending',     '○ Pending',     groups.pending)}
+    ${renderSection('in_progress', '▶ In Progress', groups.in_progress)}
+    ${groups.blocked.length > 0 ? renderSection('blocked', '✗ Blocked', groups.blocked) : ''}
+    ${renderSection('done',        '✓ Done',        groups.done, groups.done.length > 3)}
+  `;
+}
+
+function renderSection(id, title, tasks, collapsed = false) {
+  const count = tasks.length;
+  const pillClass = id === 'done' ? 'pill-green' :
+                    id === 'blocked' ? 'pill-red' :
+                    id === 'in_progress' ? 'pill-cyan' : 'pill-violet';
+
+  return `
+    <section class="mb-6">
+      <h2 class="section-header flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-widest"
+          style="color:rgba(232,234,246,0.5)">
+        ${title}
+        <span class="pill ${pillClass}">${count}</span>
+      </h2>
+      <div class="space-y-3 ${collapsed ? 'hidden' : ''}" id="section-${id}">
+        ${tasks.map(renderCard).join('')}
+        ${count === 0 ? '<p style="color:rgba(232,234,246,0.25);font-size:0.875rem;padding:0.5rem 0">No tasks</p>' : ''}
+      </div>
+      ${collapsed ? `
+        <button onclick="document.getElementById('section-${id}').classList.toggle('hidden'); this.classList.toggle('hidden')"
+                class="text-xs pill pill-green mt-1">
+          Show ${count} completed ↓
+        </button>
+      ` : ''}
+    </section>
+  `;
+}
+
+function renderCard(task) {
+  const agent       = state.agents.find(a => a.name === task.owner);
+  const agentStatus = agent ? getAgentStatus(agent) : 'offline';
+  const priorityClass = task.priority > 0 ? `priority-${task.priority}` : '';
+
+  return `
+    <div class="glass-card p-4 cursor-pointer" onclick="openDetail(${task.id})">
+      <div class="font-medium mb-1.5 text-sm ${priorityClass}" style="color:#e8eaf6">
+        <span style="color:rgba(232,234,246,0.3)">#${task.id}</span> ${escapeHtml(task.subject)}
+      </div>
+      <div class="flex items-center gap-2 flex-wrap" style="font-size:0.75rem;color:rgba(232,234,246,0.4)">
+        ${task.owner ? `
+          <span class="flex items-center gap-1.5">
+            <span class="agent-dot ${agentStatus}"></span>
+            <span>${escapeHtml(task.owner)}</span>
+          </span>
+          <span style="color:rgba(232,234,246,0.2)">·</span>
+        ` : `<span style="color:rgba(232,234,246,0.25)">unassigned</span><span style="color:rgba(232,234,246,0.2)">·</span>`}
+        <span>${timeAgo(task.updated_at || task.created_at)}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════
+// DETAIL SHEET
+// ═══════════════════════════════════════════
+async function openDetail(taskId) {
+  state.selectedTask = taskId;
+  const sheet   = document.getElementById('sheet');
+  const backdrop = document.getElementById('sheet-backdrop');
+  const content = document.getElementById('sheet-content');
+
+  content.innerHTML = `
+    <div class="space-y-3 animate-pulse">
+      <div class="skeleton h-8 w-3/4"></div>
+      <div class="skeleton h-4 w-1/2"></div>
+      <div class="skeleton h-20 mt-4"></div>
+    </div>
+  `;
+  backdrop.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    sheet.classList.remove('sheet-hidden');
+    sheet.classList.add('sheet-visible');
+  });
+
+  try {
+    const data = await api.get(`/api/task/${taskId}`);
+    content.innerHTML = renderDetail(data.task, data.messages);
+  } catch (e) {
+    content.innerHTML = `
+      <div class="text-center py-8">
+        <p style="color:#fca5a5;margin-bottom:0.5rem">Failed to load task</p>
+        <button onclick="openDetail(${taskId})" class="pill pill-cyan">Retry</button>
+      </div>
+    `;
+  }
+}
+
+function renderDetail(task, messages) {
+  const canClaim    = !task.owner || task.status === 'pending';
+  const canComplete = task.status === 'in_progress' || task.status === 'claimed';
+  const statusPill  = task.status === 'done'        ? 'pill-green'  :
+                      task.status === 'in_progress' ? 'pill-cyan'   :
+                      task.status === 'blocked'     ? 'pill-red'    : 'pill-violet';
+
+  return `
+    <div class="space-y-4">
+      <div>
+        <p style="color:rgba(232,234,246,0.35);font-size:0.75rem;margin-bottom:4px">#${task.id}</p>
+        <h2 class="text-xl font-semibold" style="color:#e8eaf6">${escapeHtml(task.subject)}</h2>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <span class="pill ${statusPill}">${task.status.replace('_', ' ')}</span>
+        ${task.owner ? `<span class="pill pill-violet">${escapeHtml(task.owner)}</span>` : '<span class="pill" style="color:rgba(232,234,246,0.4)">unassigned</span>'}
+        <span class="pill" style="color:rgba(232,234,246,0.4)">${timeAgo(task.created_at)}</span>
+      </div>
+
+      ${task.description ? `
+        <div>
+          <p style="color:rgba(232,234,246,0.4);font-size:0.75rem;margin-bottom:6px">Description</p>
+          <div class="glass" style="border-radius:12px;padding:12px;font-size:0.875rem;white-space:pre-wrap;color:rgba(232,234,246,0.8)">${escapeHtml(task.description)}</div>
+        </div>
+      ` : ''}
+
+      ${messages.length > 0 ? `
+        <div>
+          <p style="color:rgba(232,234,246,0.4);font-size:0.75rem;margin-bottom:6px">Messages (${messages.length})</p>
+          <div class="space-y-2">
+            ${messages.map(m => `
+              <div class="glass" style="border-radius:12px;padding:12px;font-size:0.8rem">
+                <div class="flex justify-between items-start" style="margin-bottom:4px">
+                  <span style="color:#67e8f9;font-weight:500">${escapeHtml(m.from_agent)}</span>
+                  <span style="color:rgba(232,234,246,0.3);font-size:0.7rem">${timeAgo(m.created_at)}</span>
+                </div>
+                <p style="color:rgba(232,234,246,0.75)">${escapeHtml(m.body)}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="flex gap-3 pt-2 sticky bottom-0 pb-2" style="background:rgba(12,10,30,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">
+        ${canClaim ? `
+          <button onclick="claimTask(${task.id})"
+                  class="btn-action btn-cyan flex-1 font-medium text-sm">
+            Claim
+          </button>
+        ` : ''}
+        ${canComplete ? `
+          <button onclick="completeTask(${task.id})"
+                  class="btn-action btn-green flex-1 font-medium text-sm">
+            Complete
+          </button>
+        ` : ''}
+        ${!canClaim && !canComplete && task.status === 'done' ? `
+          <div class="flex-1 text-center py-3 pill-green text-sm">✓ Completed</div>
+        ` : ''}
+        <button onclick="closeDetail()"
+                class="btn-action btn-glass px-5 text-sm">
+          Close
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function closeDetail() {
+  const sheet   = document.getElementById('sheet');
+  const backdrop = document.getElementById('sheet-backdrop');
+  sheet.classList.remove('sheet-visible');
+  sheet.classList.add('sheet-hidden');
+  setTimeout(() => backdrop.classList.add('hidden'), 300);
+  state.selectedTask = null;
+}
+
+// ═══════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════
+async function claimTask(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (task) { task.owner = 'mobile'; task.status = 'in_progress'; renderBoard(); }
+  closeDetail();
+  try {
+    await api.post(`/api/task/${taskId}/claim`, { agent: 'mobile' });
+    await fetchBoard();
+  } catch (e) {
+    console.error('Claim failed:', e);
+    await fetchBoard();
+  }
+}
+
+async function completeTask(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (task) { task.status = 'done'; renderBoard(); }
+  closeDetail();
+  try {
+    await api.post(`/api/task/${taskId}/complete`, {});
+    await fetchBoard();
+  } catch (e) {
+    console.error('Complete failed:', e);
+    await fetchBoard();
+  }
+}
+
+// ═══════════════════════════════════════════
+// REAL-TIME (SSE)
+// ═══════════════════════════════════════════
+function connectSSE() {
+  if (state.eventSource) state.eventSource.close();
+  const es = new EventSource(`/api/heartbeat?token=${state.token}`);
+  state.eventSource = es;
+
+  es.onopen = () => {
+    state.sseRetries = 0;
+    showConnectionStatus(true);
+  };
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.refresh) fetchBoard();
+    } catch (err) { console.error('SSE parse error:', err); }
+  };
+  es.onerror = () => {
+    es.close();
+    showConnectionStatus(false);
+    state.sseRetries++;
+    const delay = Math.min(1000 * (2 ** state.sseRetries), 30000);
+    setTimeout(connectSSE, delay);
+  };
+}
+
+function showConnectionStatus(connected) {
+  const status = document.getElementById('connection-status');
+  if (connected) {
+    status.classList.remove('hidden');
+    setTimeout(() => status.classList.add('hidden'), 3000);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    fetchBoard();
+    if (!state.eventSource || state.eventSource.readyState === EventSource.CLOSED) {
+      connectSSE();
+    }
+  }
+});
+
+// ═══════════════════════════════════════════
+// CACHE
+// ═══════════════════════════════════════════
+function saveCache(data) {
+  try { localStorage.setItem('betta_board', JSON.stringify({ data, timestamp: Date.now() })); }
+  catch (e) { console.warn('Cache save failed:', e); }
+}
+function loadCache() {
+  try { const c = localStorage.getItem('betta_board'); return c ? JSON.parse(c) : null; }
+  catch { return null; }
+}
+function showStaleIndicator(timestamp) {
+  document.getElementById('stale-time').textContent = timeAgo(new Date(timestamp).toISOString());
+  document.getElementById('stale-banner').classList.remove('hidden');
+}
+function hideStaleIndicator() {
+  document.getElementById('stale-banner').classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'unknown';
+  const date    = new Date(dateStr.replace(' ', 'T') + 'Z');
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60)    return 'just now';
+  if (seconds < 3600)  return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function getAgentStatus(agent) {
+  if (!agent || !agent.last_seen) return 'offline';
+  const lastSeen   = new Date(agent.last_seen.replace(' ', 'T') + 'Z');
+  const minutesAgo = (Date.now() - lastSeen.getTime()) / 60000;
+  if (minutesAgo > 15) return 'offline';
+  if (agent.status === 'busy') return 'active';
+  return 'idle';
+}
+
+function showError(message) {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('error-message').textContent = message;
+  document.getElementById('error-overlay').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  if (!state.token) { showError('Missing token in URL'); return; }
+  fetchBoard();
+  connectSSE();
+});
+  </script>
+</body>
+</html>
